@@ -1,0 +1,99 @@
+name: Build UnitedSets (.exe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target architecture'
+        type: choice
+        default: 'x64'
+        options:
+          - x64
+          - arm64
+          - x86
+      bundling:
+        description: 'Runtime bundling mode'
+        type: choice
+        default: 'self-contained-dotnet'
+        options:
+          - self-contained-dotnet
+          - framework-dependent
+          - fully-self-contained
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine build flags
+        id: flags
+        shell: pwsh
+        run: |
+          $platform = "${{ inputs.platform || 'x64' }}"
+          $bundling = "${{ inputs.bundling || 'self-contained-dotnet' }}"
+          $rid = "win-$platform"
+          switch ($bundling) {
+            'framework-dependent' {
+              $selfContained = 'false'
+              $wasdkSelfContained = 'false'
+            }
+            'fully-self-contained' {
+              $selfContained = 'true'
+              $wasdkSelfContained = 'true'
+            }
+            default {
+              $selfContained = 'true'
+              $wasdkSelfContained = 'false'
+            }
+          }
+          "platform=$platform" >> $env:GITHUB_OUTPUT
+          "rid=$rid" >> $env:GITHUB_OUTPUT
+          "self_contained=$selfContained" >> $env:GITHUB_OUTPUT
+          "wasdk_self_contained=$wasdkSelfContained" >> $env:GITHUB_OUTPUT
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: |
+          dotnet restore UnitedSets/UnitedSets.csproj `
+            -r ${{ steps.flags.outputs.rid }} `
+            -p:Platform=${{ steps.flags.outputs.platform }}
+
+      - name: Publish unpackaged Release .exe
+        shell: pwsh
+        run: |
+          dotnet publish UnitedSets/UnitedSets.csproj `
+            -c Release `
+            -r ${{ steps.flags.outputs.rid }} `
+            --self-contained ${{ steps.flags.outputs.self_contained }} `
+            -p:Platform=${{ steps.flags.outputs.platform }} `
+            -p:WindowsPackageType=None `
+            -p:WindowsAppSDKSelfContained=${{ steps.flags.outputs.wasdk_self_contained }} `
+            -p:AppxPackageSigningEnabled=false `
+            -o publish/UnitedSets-${{ steps.flags.outputs.rid }}
+
+      - name: Verify UnitedSets.exe exists
+        shell: pwsh
+        run: |
+          $exe = "publish/UnitedSets-${{ steps.flags.outputs.rid }}/UnitedSets.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "Expected $exe not found!"
+            exit 1
+          }
+          $files = Get-ChildItem -Recurse "publish/UnitedSets-${{ steps.flags.outputs.rid }}" -File
+          $totalMB = [math]::Round(($files | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+          Write-Host "Published $($files.Count) files totaling $totalMB MB"
+          Get-Item $exe | Select-Object Name, Length, FullName
+
+      - name: Upload UnitedSets artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnitedSets-${{ steps.flags.outputs.rid }}
+          path: publish/UnitedSets-${{ steps.flags.outputs.rid }}/**
+          retention-days: 14
