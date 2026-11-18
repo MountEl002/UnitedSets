@@ -29,8 +29,12 @@ static class Constants
     {
         get
         {
+#if UNPKG
+            return "0.1.16";
+#else
             var version = Package.Current.Id.Version;
             return $"{version.Major}.{version.Minor}.{version.Build}";
+#endif
         }
     }
     public const string UnitedSetsLifeCycleKey = "UnitedSetsLifeCycle";
