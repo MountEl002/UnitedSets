@@ -91,6 +91,11 @@ jobs:
             -p:AppxPackageSigningEnabled=false `
             -o publish/UnitedSets-${{ steps.flags.outputs.rid }}
 
+      - name: Copy app Assets to publish folder
+        shell: pwsh
+        run: |
+          Copy-Item -Path "UnitedSets/Assets" -Destination "publish/UnitedSets-${{ steps.flags.outputs.rid }}/Assets" -Recurse -Force
+
       - name: Verify UnitedSets.exe exists
         shell: pwsh
         run: |
