@@ -58,6 +58,19 @@ jobs:
           "self_contained=$selfContained" >> $env:GITHUB_OUTPUT
           "wasdk_self_contained=$wasdkSelfContained" >> $env:GITHUB_OUTPUT
 
+      - name: Pack local dependency Get.UI.Data.WASDK (1.0.11)
+        shell: pwsh
+        run: |
+          $localFeed = Join-Path "${{ github.workspace }}" "_local-nuget"
+          New-Item -ItemType Directory -Force -Path $localFeed | Out-Null
+          git clone --depth 1 https://github.com/Gtudios-UI/UI-Data.git _deps/UI-Data
+          dotnet pack "_deps/UI-Data/UI Data.WASDK/UI Data.WASDK.csproj" `
+            -c Release `
+            -p:PackageId=Get.UI.Data.WASDK `
+            -p:PackageOutputPath="$localFeed"
+          Get-ChildItem $localFeed
+          dotnet nuget add source "$localFeed" --name local-deps
+
       - name: Restore NuGet packages
         shell: pwsh
         run: |
