@@ -160,4 +160,7 @@
             </ItemGroup>
         </When>
     </Choose>
+    <PropertyGroup Condition="'$(WindowsPackageType)'=='None' and '$(Configuration)'!='DebugUnpackaged'">
+        <DefineConstants>$(DefineConstants);UNPKG</DefineConstants>
+    </PropertyGroup>
 </Project>
